@@ -1,0 +1,36 @@
+name: Build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Show developer tools
+        run: |
+          xcodebuild -version
+          xcrun swift --version
+          xcrun --sdk macosx --show-sdk-path
+      - name: Check shell syntax
+        run: |
+          for script in scripts/*.sh; do
+            sh -n "$script"
+          done
+      - name: Run Swift Testing
+        run: sh scripts/test.sh
+      - name: Build Apple Silicon executable
+        run: |
+          . scripts/swift-env.sh
+          "$LAUNCHTABLET_SWIFT" build -c release --arch arm64

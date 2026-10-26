@@ -1,0 +1,51 @@
+LaunchTablet 测试版
+
+适用系统
+macOS 14 或更高版本，Apple 芯片（M 系列）Mac。
+
+安装
+1. 将 LaunchTablet.app 拖到旁边的 Applications（应用程序）文件夹。
+2. 安装后推出此磁盘映像，从“应用程序”中打开 LaunchTablet。
+3. 更新旧版本前，请先在 LaunchTablet 设置中退出，再替换应用。
+
+首次打开
+本测试版使用本地临时签名，尚未经过 Apple 开发者签名及公证。
+如果 macOS 阻止打开，请先尝试打开一次，然后到“系统设置 → 隐私与安全性”，
+找到该应用对应的拦截提示，选择“仍要打开”，按系统提示确认。
+仅在确认安装包来自可信发送者后执行此操作，无需关闭系统安全保护。
+如果没有对应选项或仍无法打开，请把系统提示原文反馈给发送者。
+
+基本操作
+• 点击 Dock 图标或按 Control + Option + 空格呼出/收起。
+• 窗口在鼠标所在显示器出现，网格最大限制在中央区域。
+• 直接输入搜索；按方向键选择，回车打开。
+• 横向轻扫、鼠标滚轮或底部分页圆点可翻页。
+• Esc 依次关闭弹层、关闭文件夹、清空搜索，最后收起窗口。
+• 拖到图标两侧显示插入线，松手排序；文件夹也支持拖动排序。
+• 应用中央停留约 0.45 秒出现加号后松手建文件夹；已有文件夹可直接拖入。
+• 悬停文件夹约 0.75 秒展开，可调整内部顺序；面板外停留约 0.5 秒返回主网格。
+• 支持从文件夹移回主网格、移入其它文件夹，拖动中 Esc 取消。
+• 呼出时由大变小落定，收起时放大淡出；文件夹开合及隐藏图标也有过渡效果。
+• 遵循系统“减少动态效果”，开启后只保留淡入淡出。
+• 右下角设置可切换“跟随系统 / 简体中文 / English”，即时生效并记住选择。
+• 设置中还可修改快捷键、恢复默认分类与排序、退出程序。
+
+默认分类与排序
+Apple 应用优先，第三方应用按可读取的安装日期从早到晚排列。
+系统辅助程序归入“其它”，工具和开发类归入“工具”，游戏归入“游戏”。
+Edge Apps 和 Chrome Apps 目录内的网页应用分别归入“Edge”“Chrome”文件夹。
+分类与安装日期由系统元数据推断，可能存在误差；支持手动整理。
+
+反馈建议
+请附上 macOS 版本、芯片型号、显示器数量及缩放设置、重现步骤。
+显示或图标问题可附截图，键盘和翻页问题请注明输入设备及当时是否正在搜索。
+
+English quick start
+Requires an Apple Silicon Mac running macOS 14 or later.
+1. Drag LaunchTablet.app into Applications, then eject the disk image.
+2. Quit the previous launcher before opening LaunchTablet.
+3. Show/hide with Control + Option + Space. Type to search, scroll to turn pages, or press Esc to go back.
+4. Change Settings → Language to System default, 简体中文, or English. Custom folder names stay unchanged.
+5. Drag beside icons to reorder, onto folders to add, or hover over a folder to open it.
+This Preview uses an ad hoc signature and is not notarized. If macOS blocks a trusted copy, try opening it once, then use System Settings → Privacy & Security → Open Anyway.
+Upgrades from the old Launchpad project name preserve the old layout file and write future changes to the LaunchTablet directory.
