@@ -28,6 +28,7 @@ enum TextKey: String, CaseIterable {
     case openFolder, renameFolder, dissolveFolder, openApplication, revealInFinder, moveOutOfFolder, newFolder, hideApplication
     case pageDescription, currentPage, previousPage, nextPage, folderName, closeFolder, folder, application
     case settingsTitle, displayDescription, shortcutTitle, languageTitle, systemLanguage
+    case gridAreaTitle, gridAreaFullScreen, gridArea14, gridArea16, gridArea24, gridArea27
     case refreshApplications, manualArrangement, defaultArrangement, resetArrangement, resetConfirmation, resetButton, cancel, resetExplanation
     case hiddenApplications, noHiddenApplications, restoreApplication, organizationHelp, quitApplication
     case shortcutDisabled, spaceKey, invalidLayout, inaccessibleApplications, launchFailed, saveFailed, shortcutUnavailable

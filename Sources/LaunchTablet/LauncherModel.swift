@@ -41,6 +41,12 @@ final class LauncherModel: ObservableObject {
             languageChanged?()
         }
     }
+    @Published var gridDisplayMode: GridDisplayMode {
+        didSet {
+            guard gridDisplayMode != oldValue else { return }
+            preferences.set(gridDisplayMode.rawValue, forKey: "gridDisplayMode")
+        }
+    }
     @Published private(set) var isLoading = true
     @Published private(set) var isLaunching = false
     @Published private(set) var hasCatalogWarning = false
@@ -99,6 +105,8 @@ final class LauncherModel: ObservableObject {
             AppIdentity.migrateLegacyPreferences(to: preferences, legacyValues: preferences.persistentDomain(forName: AppIdentity.legacyBundleIdentifier) ?? [:])
         }
         self.language = InterfaceLanguage(rawValue: preferences.string(forKey: "interfaceLanguage") ?? "") ?? .system
+        // 未配置和未知配置均保留旧版的 14 寸显示范围；仅保存偏好，不重写用户排列。
+        self.gridDisplayMode = GridDisplayMode(rawValue: preferences.string(forKey: "gridDisplayMode") ?? "") ?? .macBook14
         self.scanApplications = scanApplications
         self.shortcut = ShortcutPreset(rawValue: preferences.string(forKey: "shortcut") ?? "") ?? .controlOptionSpace
         do { self.layout = try repository.load() }

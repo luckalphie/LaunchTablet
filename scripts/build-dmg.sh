@@ -28,7 +28,7 @@ trap 'rm -rf "$STAGING"' EXIT HUP INT TERM
 mkdir -p "$STAGING/payload"
 ditto "$APP" "$STAGING/payload/LaunchTablet.app"
 ln -s /Applications "$STAGING/payload/Applications"
-cp "$ROOT/docs/测试版安装说明.txt" "$STAGING/payload/安装与使用说明.txt"
+cp "$ROOT/docs/安装与使用说明.txt" "$STAGING/payload/安装与使用说明.txt"
 cp "$ROOT/LICENSE" "$STAGING/payload/LICENSE.txt"
 
 # 只装入应用和说明，不包含本机保存的布局、用户偏好或源码。先验证镜像再替换输出。

@@ -54,9 +54,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>LaunchTablet.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.3.0</string>
+    <string>1.0.0</string>
     <key>CFBundleVersion</key>
-    <string>9</string>
+    <string>13</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>

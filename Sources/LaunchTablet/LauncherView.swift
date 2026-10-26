@@ -12,7 +12,7 @@ struct LauncherView: View {
 
     var body: some View {
         GeometryReader { screen in
-            let metrics = GridMetrics(screenSize: screen.size)
+            let metrics = GridMetrics(screenSize: screen.size, displayMode: model.gridDisplayMode)
             ZStack {
                 desktopBackground(size: screen.size)
                     .onTapGesture { model.dismissRequested?() }
@@ -28,8 +28,8 @@ struct LauncherView: View {
                         ContentUnavailableView(model.query.isEmpty ? model.text(.noApplications) : model.text(.noResults), systemImage: model.query.isEmpty ? "square.grid.3x3" : "magnifyingglass", description: Text(model.query.isEmpty ? model.text(.restoreHiddenHint) : model.text(.searchHint)))
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
-                        PagedApplicationGrid(model: model, items: model.rootItems, columns: metrics.columns, rows: metrics.rows, page: model.page, iconSize: metrics.iconSize)
-                            .padding(.horizontal, 14)
+                        PagedApplicationGrid(model: model, items: model.rootItems, columns: metrics.columns, rows: metrics.rows, page: model.page, iconSize: metrics.iconSize, animationViewportWidth: metrics.pageViewportWidth, scrollOffset: model.openFolderID == nil ? model.scrollOffset : 0)
+                            .padding(.horizontal, GridMetrics.horizontalGridPadding)
                     }
                     PageDots(localizer: model.localizer, count: model.rootPageCount, current: model.page, hidden: model.openFolderID != nil) { model.setPage($0) }
                         .padding(.top, 16)
@@ -151,30 +151,15 @@ struct LauncherView: View {
     }
 }
 
-private struct GridMetrics: Equatable {
-    let width: CGFloat
-    let height: CGFloat
-    let columns: Int
-    let rows: Int
-    let iconSize: CGFloat
-
-    init(screenSize: CGSize) {
-        // 逻辑点上限对应之前确认的 14 寸体验，不按显示器物理英寸换算，也不随大屏无限拉开。
-        width = min(1120, max(300, screenSize.width - 88))
-        height = min(790, max(330, screenSize.height - 72))
-        columns = width < 760 ? 5 : 7
-        rows = height < 560 ? 4 : 5
-        iconSize = min(78, max(42, min(width / CGFloat(columns) * 0.52, (height - 150) / CGFloat(rows) * 0.64)))
-    }
-}
-
-private struct PagedApplicationGrid: View {
+struct PagedApplicationGrid: View {
     @ObservedObject var model: LauncherModel
     let items: [LauncherItem]
     let columns: Int
     let rows: Int
     let page: Int
     let iconSize: CGFloat
+    var animationViewportWidth: CGFloat? = nil
+    var scrollOffset: CGFloat = 0
     var isFolderGrid = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -183,7 +168,8 @@ private struct PagedApplicationGrid: View {
 
     var body: some View {
         GeometryReader { viewport in
-            let spacing: CGFloat = 14
+            let paging = PageViewportMetrics(contentWidth: viewport.size.width, viewportWidth: animationViewportWidth)
+            let spacing = GridMetrics.cellSpacing
             let cellWidth = max(1, (viewport.size.width - CGFloat(columns - 1) * spacing) / CGFloat(columns))
             let cellHeight = max(1, (viewport.size.height - CGFloat(rows - 1) * spacing) / CGFloat(rows))
             HStack(spacing: 0) {
@@ -204,6 +190,7 @@ private struct PagedApplicationGrid: View {
                     }
                     .animation(reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.28, dampingFraction: 0.86), value: items)
                     .frame(width: viewport.size.width, height: viewport.size.height, alignment: .top)
+                    .padding(.horizontal, paging.contentInset)
                     .accessibilityHidden(pageIndex != page || (!isFolderGrid && model.openFolderID != nil))
                     .allowsHitTesting(pageIndex == page)
                     .accessibilityScrollAction { edge in
@@ -215,13 +202,14 @@ private struct PagedApplicationGrid: View {
                     }
                 }
             }
-            .offset(x: -CGFloat(page) * viewport.size.width + (model.openFolderID == nil || isFolderGrid ? model.scrollOffset : 0))
+            .offset(x: -CGFloat(page) * paging.pageStride + scrollOffset)
             .animation(reduceMotion ? nil : .spring(response: 0.34, dampingFraction: 0.88), value: page)
             .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: model.isScrolling)
-            .frame(width: viewport.size.width, height: viewport.size.height, alignment: .leading)
-            // clipped 只裁剪绘制；同时限制命中区域，防止屏幕外的下一页图标响应背景点击。
-            .contentShape(Rectangle())
+            // 先在宽视口内裁切，再居中回原网格尺寸；图标可滑出网格，静止位置与点击范围保持不变。
+            .frame(width: paging.viewportWidth, height: viewport.size.height, alignment: .leading)
             .clipped()
+            .frame(width: viewport.size.width, height: viewport.size.height)
+            .contentShape(Rectangle())
             .accessibilityElement(children: .contain)
             .accessibilityScrollAction { edge in
                 switch edge {
@@ -240,6 +228,10 @@ private struct ApplicationTile: View {
     let width: CGFloat
     @State private var hovering = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // 大图标同时放大名称和图文间距，保持完整的图标单元比例；普通尺寸沿用原值。
+    private var captionSize: CGFloat { GridMetrics.captionFontSize(for: iconSize) }
+    private var captionSpacing: CGFloat { GridMetrics.captionSpacing(for: iconSize) }
 
     var body: some View {
         Group {
@@ -267,7 +259,7 @@ private struct ApplicationTile: View {
 
     private var tile: some View {
         Button { model.activate(item) } label: {
-            VStack(spacing: 9) {
+            VStack(spacing: captionSpacing) {
                 Group {
                     if item.isFolder { FolderIcon(model: model, item: item, size: iconSize) }
                     else if let application = model.application(for: item) {
@@ -279,7 +271,7 @@ private struct ApplicationTile: View {
                 .shadow(color: .black.opacity(0.2), radius: 5, y: 3)
                 .scaleEffect(!reduceMotion && (hovering || (model.dropTargetID == item.id && model.isGroupingDrop)) ? 1.055 : 1)
                 Text(model.title(for: item))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.system(size: captionSize, weight: .medium))
                     .foregroundStyle(.white)
                     .lineLimit(1).truncationMode(.tail)
                     .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
@@ -329,7 +321,8 @@ private struct FolderIcon: View {
     let size: CGFloat
 
     var body: some View {
-        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 3), count: 3), spacing: 3) {
+        let spacing = max(3, size * 3 / 78)
+        LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3), spacing: spacing) {
             ForEach(0..<9, id: \.self) { index in
                 if index < item.applicationIDs.count, let app = model.application(id: item.applicationIDs[index]) {
                     Image(nsImage: model.icons.image(for: app)).resizable().aspectRatio(contentMode: .fit)
@@ -414,7 +407,7 @@ private struct FolderPanel: View {
             }
             .padding(.horizontal, 12).padding(.top, 5)
 
-            PagedApplicationGrid(model: model, items: model.folderItems, columns: 4, rows: 3, page: model.folderPage, iconSize: min(78, max(42, (availableSize.height - 260) / 6)), isFolderGrid: true)
+            PagedApplicationGrid(model: model, items: model.folderItems, columns: 4, rows: 3, page: model.folderPage, iconSize: min(78, max(42, (availableSize.height - 260) / 6)), scrollOffset: model.scrollOffset, isFolderGrid: true)
                 .overlay {
                     if model.folderPageCount > 1 {
                         HStack {
@@ -458,6 +451,10 @@ struct LauncherSettings: View {
             Picker(model.text(.shortcutTitle), selection: $model.shortcut) {
                 ForEach(ShortcutPreset.allCases) { preset in Text(preset.label(using: model.localizer)).tag(preset) }
             }
+            Picker(model.text(.gridAreaTitle), selection: $model.gridDisplayMode) {
+                ForEach(GridDisplayMode.allCases) { mode in Text(mode.title(using: model.localizer)).tag(mode) }
+            }
+            .accessibilityIdentifier("grid-display-mode")
             Picker(model.text(.languageTitle), selection: $model.language) {
                 Text(model.text(.systemLanguage)).tag(InterfaceLanguage.system)
                 Text("简体中文").tag(InterfaceLanguage.simplifiedChinese)

@@ -30,6 +30,12 @@
 "settingsTitle" = "LaunchTablet Settings";
 "displayDescription" = "Display: %@";
 "shortcutTitle" = "Show / Hide";
+"gridAreaTitle" = "Grid area";
+"gridAreaFullScreen" = "Full screen";
+"gridArea14" = "14-inch";
+"gridArea16" = "16-inch";
+"gridArea24" = "24-inch";
+"gridArea27" = "27-inch";
 "languageTitle" = "Language";
 "systemLanguage" = "System default";
 "refreshApplications" = "Refresh Apps";

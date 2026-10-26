@@ -30,6 +30,12 @@
 "settingsTitle" = "LaunchTablet 设置";
 "displayDescription" = "当前屏幕：%@";
 "shortcutTitle" = "呼出 / 收起";
+"gridAreaTitle" = "网格显示范围";
+"gridAreaFullScreen" = "全屏";
+"gridArea14" = "14 英寸";
+"gridArea16" = "16 英寸";
+"gridArea24" = "24 英寸";
+"gridArea27" = "27 英寸";
 "languageTitle" = "界面语言";
 "systemLanguage" = "跟随系统";
 "refreshApplications" = "刷新应用列表";

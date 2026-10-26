@@ -2,17 +2,23 @@
 
 [English](README.en.md)
 
-面向大屏幕的 macOS 原生应用启动器，使用 SwiftUI + AppKit。当前为 **0.3.0 Preview**，安装包面向 **Apple 芯片 Mac**，最低部署目标为 macOS 14。
+面向大屏幕的 macOS 原生应用启动器，使用 SwiftUI + AppKit。当前为 **1.0.0 正式版**，安装包面向 **Apple 芯片 Mac**，最低部署目标为 macOS 14。
 
 这是社区独立项目，与 Apple 无隶属或背书关系。
 
 Apple、Microsoft Edge、Google Chrome 等品牌名称和预览中的应用图标归各自权利人所有；MIT 许可适用于本项目代码和自有素材。
 
-整个屏幕作为背景，应用网格限制在中央最大 **1120 × 790 逻辑点**的区域；小屏幕跟随缩小，大屏幕保持紧凑。这个尺寸是按 14 寸 MacBook 的浏览体验设定的初始上限。
+整个屏幕作为背景，应用网格支持「全屏 / 14 英寸 / 16 英寸 / 24 英寸 / 27 英寸」五种显示范围，可在设置中即时切换并自动保存。默认 14 英寸，居中区域最大 **1120 × 790 逻辑点**；16 英寸最大 **1280 × 900 逻辑点**，24 英寸最大 **1920 × 1080**，27 英寸最大 **2160 × 1215**；全屏图标和名称随可用空间放大，左右各留约 10%、上下各留约 5% 的边距，超宽屏额外收拢横向范围；小屏幕自动缩小。这些是参照不同尺寸屏幕浏览体验的区域预设，不是物理英寸测量。
+
+主网格的翻页可见范围独立于静止网格：全屏延伸到屏幕左右边缘，其它预设在左右各增加一列宽度的过渡空间，空间不足时延伸到屏幕边缘。页面停下后仍居中，相邻页不会提前露出。24/27 英寸预设也会按可用空间放大图标与名称。
 
 ![LaunchTablet 界面预览](docs/images/overview.png)
 
 预览使用真实界面和示例应用离屏生成，不包含个人应用清单或壁纸。界面支持简体中文和英文，默认跟随系统，也可在设置中即时切换。
+
+## 下载与安装
+
+从 [GitHub Releases](https://github.com/luckalphie/LaunchTablet/releases/latest) 下载 DMG，将 LaunchTablet 拖入 Applications，推出镜像后打开。升级前先退出旧版本。安装包同时提供 SHA-256 校验文件。
 
 ## 启动
 
@@ -22,13 +28,13 @@ Apple、Microsoft Edge、Google Chrome 等品牌名称和预览中的应用图�
 
 日常使用只需 `dist/LaunchTablet.app`。内部副屏验收使用 `sh scripts/build-app.sh --test-secondary`，测试包生成到 `.build/ui-testing/LaunchTablet.app`，不放进交付目录。测试包使用独立应用标识，固定在副屏显示，副屏断开时不回退主屏；测试布局单独保存在 `.build/ui-testing/layout.json`，且不注册全局快捷键，避免干扰正式版本。
 
-发给别人测试：执行 `sh scripts/build-dmg.sh`，生成 `dist/LaunchTablet-<版本>-<构建号>-arm64.dmg` 及 SHA-256 校验文件。DMG 包含正式应用、Applications 快捷入口和安装说明，适用于 Apple 芯片（M 系列）Mac，要求 macOS 14 或更高版本。
+生成分发安装包：执行 `sh scripts/build-dmg.sh`，生成 `dist/LaunchTablet-<版本>-<构建号>-arm64.dmg` 及 SHA-256 校验文件。DMG 包含正式应用、Applications 快捷入口和安装说明，适用于 Apple 芯片（M 系列）Mac，要求 macOS 14 或更高版本。
 
 脚本通过 `xcrun` 使用当前选中的 Xcode 或 Command Line Tools，不会自动切换开发者目录或绑定某一版本 SDK。可以用 `xcode-select -p`、`xcrun swift --version` 和 `xcrun --sdk macosx --show-sdk-path` 检查环境。调用方设置的 `DEVELOPER_DIR` 和 `SDKROOT` 会被保留。
 
 如工具链与 SDK 不兼容，请安装配套版本，或在单次命令前设置 `DEVELOPER_DIR=/你的开发者目录 SDKROOT=/配套的SDK目录`。仅设置 `DEVELOPER_DIR` 时，SDK 会从该目录自动查找。需要 Xcode 首次启动设置或许可确认时，请先手动完成。
 
-本机 CLT 默认的 macOS 27 SDK 缺少 `SwiftUIMacros` 插件，使用完整 Xcode 可正常构建；CLT 显式选择其附带的 macOS 26.5 SDK 时，57 项测试也已通过。遇到相同报错时请使用完整 Xcode 或配套 SDK，脚本不会自动降级 SDK。
+本机 CLT 默认的 macOS 27 SDK 缺少 `SwiftUIMacros` 插件，使用完整 Xcode 可正常构建；此前也已验证 CLT 显式选择其附带的 macOS 26.5 SDK 可用。遇到相同报错时请使用完整 Xcode 或配套 SDK，脚本不会自动降级 SDK。
 
 ## 操作
 
@@ -80,21 +86,21 @@ Apple、Microsoft Edge、Google Chrome 等品牌名称和预览中的应用图�
 
 执行 `sh scripts/test.sh` 运行 Swift Testing 检查，覆盖中英文资源完整性、语言优先级、即时切换、旧布局迁移、分页、Esc 优先级、光标与网格导航、惯性处理、排序、文件夹、空位投放和持久化。测试使用临时目录，不修改日常布局。
 
-Release 打包采用本地临时签名；测试者首次打开下载的应用可能被系统拦截，可按包内说明在“隐私与安全性”中允许打开。正式对外发布时需要配置 Apple Developer 签名与公证。
+1.0.0 安装包采用本地临时签名，尚未经过 Apple Developer ID 签名与公证；首次打开下载的应用可能被系统拦截，可按包内说明在“隐私与安全性”中允许打开。
 
 ## 测试状态与已知限制
 
 - 本地开发与实机检查环境为 Apple 芯片、macOS 27；最低部署目标 macOS 14 不代表所有 14+ 系统都已经实机验收。
-- 57 项 Swift Testing 检查已在本地通过，覆盖布局、迁移、搜索、键盘和模拟滚动事件。真实触控板横扫、惯性及新版原生拖拽仍需继续实机验收，详见 [验证记录](docs/验证记录.md)。
+- 68 项 Swift Testing 检查已在本地通过，覆盖网格范围、偏好保存、布局、迁移、搜索、键盘和模拟滚动事件。真实触控板横扫、惯性及新版原生拖拽仍需继续实机验收，详见 [验证记录](docs/验证记录.md)。
 - 应用的类别可能缺失或不准确，安装日期取自系统可读取的目录/创建时间，因此默认分类与排序可能存在误差，可手动整理。
-- 安装包仅包含 arm64，不提供 Intel 版本。当前测试包尚未做 Apple 开发者签名与公证。
+- 安装包仅包含 arm64，不提供 Intel 版本。当前安装包尚未做 Apple 开发者签名与公证。
 - GitHub Actions 检查脚本语法、运行测试并编译 arm64 可执行文件，托管结果见 [构建记录](https://github.com/luckalphie/LaunchTablet/actions)。
 
 ## 隐私与权限
 
 应用读取本机应用目录、名称、图标、类别及日期，用于显示与搜索；读取当前显示器壁纸生成模糊背景。应用列表、搜索词及壁纸不会上传，本项目没有联网、遥测或统计代码。
 
-图标由系统读取并缓存在内存中；排列、隐藏状态、文件夹名和安装日期写入 `~/Library/Application Support/LaunchTablet/layout.json`。快捷键和界面语言偏好保存在系统用户偏好中。无 bundle ID 的应用会以本机路径作为标识，因此反馈问题前请先检查布局文件中的个人信息。
+图标由系统读取并缓存在内存中；排列、隐藏状态、文件夹名和安装日期写入 `~/Library/Application Support/LaunchTablet/layout.json`。快捷键、界面语言和网格显示范围保存在系统用户偏好中；改变显示范围不修改排列。无 bundle ID 的应用会以本机路径作为标识，因此反馈问题前请先检查布局文件中的个人信息。
 
 使用 Carbon 注册指定的全局快捷键；普通键盘与滚轮事件仅在启动器进程内处理，不需要授予“辅助功能”“输入监控”或“屏幕录制”权限。受系统保护、权限不足的应用目录或壁纸可能无法读取，程序会保留既有布局或使用默认背景。
 
@@ -102,6 +108,6 @@ Release 打包采用本地临时签名；测试者首次打开下载的应用可
 
 反馈问题与提交改动请参阅 [参与开发](CONTRIBUTING.md)。代码采用 [MIT License](LICENSE)。
 
-源码仓库只保存源码、文档和示例素材；`.build/`、`.swiftpm/`、`dist/` 和本机 Xcode 状态文件均排除在提交之外。面向测试者的 DMG 和校验文件应上传到 GitHub Releases。
+源码仓库只保存源码、文档和示例素材；`.build/`、`.swiftpm/`、`dist/` 和本机 Xcode 状态文件均排除在提交之外。分发的 DMG 和校验文件应上传到 GitHub Releases。
 
 文档预览可用 `sh scripts/export-preview.sh` 重新生成，使用真实 SwiftUI View 和临时示例布局，不显示窗口、不采集屏幕或个人应用列表。

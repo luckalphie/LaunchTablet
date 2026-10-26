@@ -14,6 +14,7 @@ LAUNCHTABLET_SWIFTC="$(xcrun --find swiftc)"
     Sources/LaunchTablet/Localization.swift \
     Sources/LaunchTablet/ApplicationCatalog.swift \
     Sources/LaunchTablet/GlobalShortcut.swift \
+    Sources/LaunchTablet/GridDisplayMode.swift \
     Sources/LaunchTablet/LauncherLayout.swift \
     Sources/LaunchTablet/LauncherModel.swift \
     Sources/LaunchTablet/LauncherDragSource.swift \
@@ -26,4 +27,13 @@ mkdir -p "$ROOT/.build/localization-previews"
 for language in zh-Hans en; do
     "$STAGING/export-preview" "$ROOT/.build/localization-previews/settings-$language.png" "$STAGING" "$language" settings
     "$STAGING/export-preview" "$ROOT/.build/localization-previews/folder-$language.png" "$STAGING" "$language" folder
+done
+for mode in fullScreen macBook14 macBook16 display24 display27; do
+    "$STAGING/export-preview" "$ROOT/.build/localization-previews/grid-$mode.png" "$STAGING" en overview "$mode"
+done
+for mode in fullScreen macBook14 macBook16 display24 display27; do
+    "$STAGING/export-preview" "$ROOT/.build/localization-previews/paging-$mode.png" "$STAGING" en paging "$mode"
+done
+for scene in large ultrawide portrait; do
+    "$STAGING/export-preview" "$ROOT/.build/localization-previews/fullScreen-$scene.png" "$STAGING" en "$scene" fullScreen
 done
