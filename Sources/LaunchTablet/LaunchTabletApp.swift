@@ -14,7 +14,7 @@ enum LaunchTabletApp {
             for language in [InterfaceLanguage.english, .simplifiedChinese] {
                 let localizer = Localizer(language: language)
                 // 直接检查各语言的原始键集，避免英文兜底掩盖中文资源缺失。
-                guard let directory = Localizer.resources.url(forResource: language.rawValue, withExtension: "lproj"),
+                guard let directory = Localizer.resourceDirectory(for: language),
                       let data = try? Data(contentsOf: directory.appendingPathComponent("Localizable.strings")),
                       let strings = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: String],
                       Set(strings.keys) == Set(TextKey.allCases.map(\.rawValue)),

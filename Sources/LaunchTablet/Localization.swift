@@ -43,8 +43,13 @@ struct Localizer {
     var locale: Locale { Locale(identifier: resolvedLanguage.rawValue) }
 
     /// 显式查找随包资源，不把开发机器的绝对构建路径编入 Release。
-    /// .app、Swift Package 运行/测试和离屏预览都从可执行文件附近查找同一份资源。
+    /// SwiftPM 调试构建使用生成的访问器；分发包和离屏预览从可执行文件附近查找资源。
     static let resources: Bundle = {
+        #if SWIFT_PACKAGE && DEBUG
+        // SwiftPM 测试由工具链宿主动态加载，Bundle.main 未必是本模块。
+        // 调试构建使用生成的资源访问器；Release 不引用它，避免嵌入本机绝对构建路径。
+        return .module
+        #else
         let executableDirectory = Bundle.main.executableURL?.deletingLastPathComponent()
         let candidates = [Bundle.main.resourceURL,
                           Bundle(for: LocalizationBundleAnchor.self).resourceURL?.appendingPathComponent("LaunchTablet_LaunchTablet.bundle"),
@@ -56,11 +61,18 @@ struct Localizer {
             if let bundle = Bundle(url: url), bundle.url(forResource: "en", withExtension: "lproj") != nil { return bundle }
         }
         return .main
+        #endif
     }()
 
+    static func resourceDirectory(for language: InterfaceLanguage) -> URL? {
+        // 旧 SwiftPM 会把 zh-Hans.lproj 输出为 zh-hans.lproj，Bundle 查询区分这两种拼写。
+        resources.url(forResource: language.rawValue, withExtension: "lproj")
+            ?? resources.url(forResource: language.rawValue.lowercased(), withExtension: "lproj")
+    }
+
     func text(_ key: TextKey, arguments: [CVarArg] = []) -> String {
-        let selected = Self.resources.url(forResource: resolvedLanguage.rawValue, withExtension: "lproj").flatMap(Bundle.init(url:))
-        let english = Self.resources.url(forResource: "en", withExtension: "lproj").flatMap(Bundle.init(url:))
+        let selected = Self.resourceDirectory(for: resolvedLanguage).flatMap(Bundle.init(url:))
+        let english = Self.resourceDirectory(for: .english).flatMap(Bundle.init(url:))
         let fallback = english?.localizedString(forKey: key.rawValue, value: key.rawValue, table: nil) ?? key.rawValue
         let format = selected?.localizedString(forKey: key.rawValue, value: fallback, table: nil) ?? fallback
         return arguments.isEmpty ? format : String(format: format, locale: locale, arguments: arguments)

@@ -52,7 +52,7 @@ Preview builds are ad hoc signed and are **not notarized**. macOS may block a do
 - 57 local checks cover layout, migrations, search, keyboard behavior, and simulated scrolling. Real trackpad gestures and the updated native drag interactions still need further desktop validation.
 - App categories and installation dates come from system metadata and may be missing or inaccurate.
 - Packaged builds are arm64 only. Intel packages are not provided.
-- GitHub Actions checks shell scripts, runs tests, and compiles an arm64 executable. Hosted CI results will only be available after the first push.
+- GitHub Actions checks shell scripts, runs tests, and compiles an arm64 executable. See the [hosted build results](https://github.com/luckalphie/LaunchTablet/actions).
 
 ## Language and upgrades
 

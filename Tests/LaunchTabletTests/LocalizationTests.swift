@@ -24,7 +24,7 @@ import Testing
 
     @Test func bothResourceFilesContainEveryInterfaceKey() throws {
         for language in [InterfaceLanguage.english, .simplifiedChinese] {
-            let url = try #require(Localizer.resources.url(forResource: language.rawValue, withExtension: "lproj"))
+            let url = try #require(Localizer.resourceDirectory(for: language))
                 .appendingPathComponent("Localizable.strings")
             let data = try Data(contentsOf: url)
             let strings = try #require(PropertyListSerialization.propertyList(from: data, format: nil) as? [String: String])
