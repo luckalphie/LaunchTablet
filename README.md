@@ -2,7 +2,7 @@
 
 [简体中文](README.zh-CN.md)
 
-A native macOS app launcher built with SwiftUI and AppKit, designed for large displays. The latest release is **1.0.2**; packaged builds target **Apple Silicon**, with a minimum deployment target of macOS 14. This page describes the current source; see the release notes for the published package.
+A native macOS app launcher built with SwiftUI and AppKit, designed for large displays. The latest release is **1.0.3**; packaged builds target **Apple Silicon**, with a minimum deployment target of macOS 14. This page describes the current source; see the release notes for the published package.
 
 This is an independent community project and is not affiliated with or endorsed by Apple. The interface supports English and Simplified Chinese, following the system by default with an instant language switch in Settings.
 
@@ -22,7 +22,7 @@ The preview renders the actual interface offscreen using sample apps, without pe
 - Default folders for utilities, games, and system helpers. Web apps from Edge Apps and Chrome Apps directories get separate browser folders.
 - Changes in application directories and their subdirectories trigger a background refresh; newly installed apps join the current layout automatically.
 - Apple apps appear first; third-party apps use an estimated installation order. Manual arrangements are preserved.
-- Starts in the background without showing a window. Click the Dock icon again or use **Control + Option + Space** to show it on the display containing the pointer.
+- Starts in the background without showing a window. Pin LaunchTablet to the Dock and click its icon, or use **Control + Option + Space**, to show it on the display containing the pointer. As an accessory app, it does not add a running icon to the Dock automatically.
 
 ## Build and run
 
@@ -46,7 +46,7 @@ The internal secondary-display test build is produced by `sh scripts/build-app.s
 
 Download the DMG and optional SHA-256 checksum from [GitHub Releases](https://github.com/luckalphie/LaunchTablet/releases/latest). Open the DMG, drag LaunchTablet into Applications, eject the image, and launch the installed copy. Quit the previous version before replacing it.
 
-The 1.0.2 package is ad hoc signed and **not notarized**. macOS may block a downloaded copy; after trying to open it, use **System Settings → Privacy & Security → Open Anyway** if you trust the sender. There is no need to disable system security.
+The 1.0.3 package is ad hoc signed and **not notarized**. macOS may block a downloaded copy; after trying to open it, use **System Settings → Privacy & Security → Open Anyway** if you trust the sender. There is no need to disable system security.
 
 ## Status and limitations
 

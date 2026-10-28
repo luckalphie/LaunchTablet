@@ -33,23 +33,24 @@ enum LaunchTabletApp {
         }
         let delegate = AppDelegate()
         application.delegate = delegate
-        application.setActivationPolicy(.regular)
+        // 辅助应用不主动切换台前调度中的应用组；Dock 入口需要用户固定图标。
+        application.setActivationPolicy(.accessory)
         // NSApplication 的 delegate 是弱引用，确保事件循环期间 delegate 不被 ARC（引用计数）回收。
         withExtendedLifetime(delegate) { application.run() }
     }
 }
 
-final class LauncherWindow: NSWindow {
+final class LauncherWindow: NSPanel {
     var escapePressed: (() -> Void)?
     override var canBecomeKey: Bool { true }
-    override var canBecomeMain: Bool { true }
+    override var canBecomeMain: Bool { false }
     override func cancelOperation(_ sender: Any?) { escapePressed?() }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    // 副屏验收单独保存布局，拖动和隐藏的测试不会改动日常使用的排列。
-    private lazy var model = LauncherModel(repository: secondaryTestMode
+    // 验收包单独保存布局，拖动和隐藏的测试不会改动日常使用的排列。
+    private lazy var model = LauncherModel(repository: isolatedTestMode
         ? LayoutRepository(fileURL: Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("layout.json"))
         : .standard)
     private let shortcut = GlobalShortcut()
@@ -61,11 +62,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var animationSequence = 0
     private var trackingMenu = false
     private let secondaryTestMode = Bundle.main.object(forInfoDictionaryKey: "LauncherTestOnSecondaryDisplay") as? Bool == true
+    private let mainTestMode = Bundle.main.object(forInfoDictionaryKey: "LauncherTestOnMainDisplay") as? Bool == true
+    private var isolatedTestMode: Bool { secondaryTestMode || mainTestMode }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.applicationIconImage = LauncherIcon.image(size: 512)
         configureMenu()
         configureWindow()
+        NotificationCenter.default.addObserver(self, selector: #selector(launcherResignedKey), name: NSWindow.didResignKeyNotification, object: window)
         NotificationCenter.default.addObserver(self, selector: #selector(menuTrackingBegan), name: NSMenu.didBeginTrackingNotification, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(menuTrackingEnded), name: NSMenu.didEndTrackingNotification, object: nil)
         model.dismissRequested = { [weak self] in self?.hideLauncher() }
@@ -94,19 +98,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // 冷启动只在后台准备列表；Dock 再次点击或快捷键才呼出窗口。
         model.refreshApplications()
-        NSApp.hide(nil)
     }
 
     private func configureWindow() {
-        window = LauncherWindow(contentRect: .zero, styleMask: [.borderless], backing: .buffered, defer: false)
+        // 非激活面板可以接收键盘输入，同时不必把原应用从台前调度移走。
+        window = LauncherWindow(contentRect: .zero, styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
         window.title = AppIdentity.name
         window.identifier = NSUserInterfaceItemIdentifier("launcher")
         window.isOpaque = false
         window.backgroundColor = .clear
         window.hasShadow = false
         window.isReleasedWhenClosed = false
+        window.hidesOnDeactivate = false
         // 覆盖当前桌面而不创建新的全屏 Space，也允许在其他应用的全屏 Space 中呼出。
-        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .canJoinAllApplications, .stationary, .ignoresCycle]
         window.level = NSWindow.Level(rawValue: NSWindow.Level.mainMenu.rawValue + 1)
         window.escapePressed = { [weak self] in self?.model.handleEscape() }
         window.contentView = NSHostingView(rootView: LauncherView(model: model))
@@ -122,6 +127,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // 实机验收包固定到副屏；副屏断开时停止显示，不能退回主屏打扰用户。
             guard let secondary = screens.first(where: { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value != CGMainDisplayID() }) else { return false }
             screen = secondary
+        } else if mainTestMode {
+            guard let primary = screens.first(where: { ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?.uint32Value == CGMainDisplayID() }) else { return false }
+            screen = primary
         } else {
             guard let target = screens.first(where: { NSMouseInRect(mouse, $0.frame, false) }) ?? NSScreen.main ?? screens.first else { return false }
             screen = target
@@ -143,8 +151,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         isHiding = false
         guard positionWindow() else { return }
         model.prepareToShow()
-        NSApp.unhide(nil)
-        NSApp.activate(ignoringOtherApps: true)
         window.alphaValue = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion ? 1 : 0
         window.makeKeyAndOrderFront(nil)
         NSAnimationContext.runAnimationGroup { context in
@@ -168,15 +174,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 guard let self, self.animationSequence == sequence else { return }
                 self.window.orderOut(nil)
                 self.isHiding = false
-                // 只隐藏窗口会让启动器仍占据键盘焦点；隐藏应用后系统会恢复先前应用。
-                NSApp.hide(nil)
             }
         })
     }
 
-    func applicationWillResignActive(_ notification: Notification) {
-        // 仅副屏验收包保持可见，方便用户同时使用主屏；正常发行包仍自动收起。
-        if !secondaryTestMode { hideLauncher() }
+    @objc private func launcherResignedKey(_ notification: Notification) {
+        // 面板失焦可能是弹出菜单或设置窗口；等 AppKit 完成焦点切换后再判断。
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.secondaryTestMode, !self.trackingMenu,
+                  self.window.isVisible, !self.window.isKeyWindow, NSApp.keyWindow == nil else { return }
+            self.hideLauncher()
+        }
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -189,7 +197,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     private func registerShortcut(_ preset: ShortcutPreset) {
-        guard !secondaryTestMode else { return }
+        guard !isolatedTestMode else { return }
         if !shortcut.register(preset) {
             model.failure = .shortcutUnavailable(preset)
         }

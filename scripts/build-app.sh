@@ -2,9 +2,10 @@
 set -eu
 
 case "${1:-}" in
-    "") SECONDARY_TEST=NO ;;
-    --test-secondary) SECONDARY_TEST=YES ;;
-    *) echo "Usage: sh scripts/build-app.sh [--test-secondary]" >&2; exit 2 ;;
+    "") TEST_MODE=NO ;;
+    --test-secondary) TEST_MODE=SECONDARY ;;
+    --test-main) TEST_MODE=MAIN ;;
+    *) echo "Usage: sh scripts/build-app.sh [--test-secondary|--test-main]" >&2; exit 2 ;;
 esac
 
 ROOT="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
@@ -12,10 +13,10 @@ APP="$ROOT/dist/LaunchTablet.app"
 BUNDLE_ID="com.local.launchtablet"
 DISPLAY_NAME="LaunchTablet"
 # dist 只交付一个正式应用；副屏测试包放在内部构建目录，使用独立标识避免系统缓存混淆。
-if [ "$SECONDARY_TEST" = YES ]; then
+if [ "$TEST_MODE" != NO ]; then
     APP="$ROOT/.build/ui-testing/LaunchTablet.app"
     BUNDLE_ID="com.local.launchtablet.secondary-test"
-    DISPLAY_NAME="LaunchTablet Secondary Display Test"
+    DISPLAY_NAME="LaunchTablet Display Test"
 fi
 
 cd "$ROOT"
@@ -54,13 +55,15 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>LaunchTablet.icns</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.0.2</string>
+    <string>1.0.3</string>
     <key>CFBundleVersion</key>
-    <string>15</string>
+    <string>16</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>LSMinimumSystemVersion</key>
     <string>14.0</string>
+    <key>LSUIElement</key>
+    <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
     <key>NSHighResolutionCapable</key>
@@ -70,10 +73,14 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
 PLIST
 /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE_ID" "$CONTENTS/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName $DISPLAY_NAME" "$CONTENTS/Info.plist"
-if [ "$SECONDARY_TEST" = YES ]; then
+if [ "$TEST_MODE" = SECONDARY ]; then
     /usr/libexec/PlistBuddy -c "Add :LauncherTestOnSecondaryDisplay bool true" "$CONTENTS/Info.plist"
     printf '%s\n' '"CFBundleDisplayName" = "LaunchTablet 副屏测试";' > "$CONTENTS/Resources/zh-Hans.lproj/InfoPlist.strings"
     printf '%s\n' '"CFBundleDisplayName" = "LaunchTablet Secondary Display Test";' > "$CONTENTS/Resources/en.lproj/InfoPlist.strings"
+elif [ "$TEST_MODE" = MAIN ]; then
+    /usr/libexec/PlistBuddy -c "Add :LauncherTestOnMainDisplay bool true" "$CONTENTS/Info.plist"
+    printf '%s\n' '"CFBundleDisplayName" = "LaunchTablet 主屏测试";' > "$CONTENTS/Resources/zh-Hans.lproj/InfoPlist.strings"
+    printf '%s\n' '"CFBundleDisplayName" = "LaunchTablet Main Display Test";' > "$CONTENTS/Resources/en.lproj/InfoPlist.strings"
 fi
 chmod +x "$CONTENTS/MacOS/LaunchTablet"
 # Xcode 的 Release 也可能携带指向本机源码/中间文件的调试符号；移除后再签名，避免随测试包泄露路径。
@@ -84,7 +91,7 @@ mkdir -p "$(dirname -- "$APP")"
 rm -rf "$APP"
 mv "$STAGING/LaunchTablet.app" "$APP"
 touch "$APP"
-if [ "$SECONDARY_TEST" = NO ]; then
+if [ "$TEST_MODE" = NO ]; then
     LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
     if ! "$LSREGISTER" -f "$APP"; then
         echo "Application built; macOS registration refresh was unavailable." >&2

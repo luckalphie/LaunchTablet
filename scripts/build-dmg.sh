@@ -18,8 +18,9 @@ if [ "$(lipo -archs "$APP/Contents/MacOS/LaunchTablet")" != arm64 ]; then
     echo "Expected an Apple Silicon (arm64) application." >&2
     exit 1
 fi
-if /usr/libexec/PlistBuddy -c 'Print :LauncherTestOnSecondaryDisplay' "$PLIST" >/dev/null 2>&1; then
-    echo "Refusing to distribute a secondary-display test application." >&2
+if /usr/libexec/PlistBuddy -c 'Print :LauncherTestOnSecondaryDisplay' "$PLIST" >/dev/null 2>&1 || \
+   /usr/libexec/PlistBuddy -c 'Print :LauncherTestOnMainDisplay' "$PLIST" >/dev/null 2>&1; then
+    echo "Refusing to distribute a display test application." >&2
     exit 1
 fi
 
