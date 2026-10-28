@@ -92,7 +92,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if !self.trackingMenu, event.type == .scrollWheel, self.model.handleScroll(event) { return nil }
             return event
         }
-        showLauncher()
+        // 冷启动只在后台准备列表；Dock 再次点击或快捷键才呼出窗口。
+        model.refreshApplications()
+        NSApp.hide(nil)
     }
 
     private func configureWindow() {

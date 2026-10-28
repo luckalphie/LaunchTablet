@@ -86,6 +86,7 @@ final class LauncherModel: ObservableObject {
     private var lastScrollEvent = Date.distantPast
     private var lastWheelTurn = Date.distantPast
     private var refreshTask: Task<Void, Never>?
+    private var refreshRequested = false
     private var refreshDebounce: Task<Void, Never>?
     private var pageHoverTask: Task<Void, Never>?
     private let repository: LayoutRepository
@@ -218,25 +219,36 @@ final class LauncherModel: ObservableObject {
     /// Task.detached 类似提交到 Java 后台线程池；await 后回到 MainActor 更新 UI 状态。
     @discardableResult
     func refreshApplications() -> Task<Void, Never> {
-        if let refreshTask { return refreshTask }
+        if let refreshTask {
+            // 扫描期间发生安装或呼出时，当前快照可能已经过期；完成后再扫描一次。
+            refreshRequested = true
+            return refreshTask
+        }
         let scan = scanApplications
         let task = Task { [weak self] in
-            let snapshot = await Task.detached(priority: .userInitiated, operation: scan).value
-            guard let self else { return }
-            var discovered = snapshot.applications
-            if !snapshot.inaccessibleRoots.isEmpty {
-                let found = Set(discovered.map(\.id))
-                discovered += self.applications.filter { !found.contains($0.id) }
+            while true {
+                let snapshot = await Task.detached(priority: .userInitiated, operation: scan).value
+                guard let self else { return }
+                var discovered = snapshot.applications
+                if !snapshot.inaccessibleRoots.isEmpty {
+                    let found = Set(discovered.map(\.id))
+                    discovered += self.applications.filter { !found.contains($0.id) }
+                }
+                self.hasCatalogWarning = !snapshot.inaccessibleRoots.isEmpty
+                self.applicationsByID = Dictionary(discovered.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+                self.applications = discovered
+                let oldLayout = self.layout
+                self.layout.reconcileApplications(discovered, removeMissing: snapshot.inaccessibleRoots.isEmpty)
+                if oldLayout != self.layout { self.persistLayout(markAsManual: false) }
+                self.isLoading = false
+                self.clampPages()
+                if self.refreshRequested {
+                    self.refreshRequested = false
+                    continue
+                }
+                self.refreshTask = nil
+                break
             }
-            self.hasCatalogWarning = !snapshot.inaccessibleRoots.isEmpty
-            self.applicationsByID = Dictionary(discovered.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            self.applications = discovered
-            let oldLayout = self.layout
-            self.layout.reconcileApplications(discovered, removeMissing: snapshot.inaccessibleRoots.isEmpty)
-            if oldLayout != self.layout { self.persistLayout(markAsManual: false) }
-            self.isLoading = false
-            self.clampPages()
-            self.refreshTask = nil
         }
         refreshTask = task
         return task

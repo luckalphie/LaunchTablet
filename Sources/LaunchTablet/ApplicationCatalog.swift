@@ -1,4 +1,5 @@
 import AppKit
+import CoreServices
 import Security
 
 /// 可跨线程传递的应用元数据。图标 NSImage 不放在这里，避免后台扫描携带 UI 对象。
@@ -112,7 +113,7 @@ enum ApplicationCatalog {
     ]
 
     /// 文件遍历和 Bundle 读取会阻塞线程，调用方必须放到后台任务中；不需要额外系统权限。
-    static func scan() -> CatalogSnapshot {
+    static func scan(roots: [URL] = ApplicationCatalog.roots, includeFinder: Bool = true) -> CatalogSnapshot {
         var applications: [String: InstalledApplication] = [:]
         var inaccessibleRoots = Set<String>()
         let keys: [URLResourceKey] = [.localizedNameKey, .isDirectoryKey]
@@ -160,7 +161,7 @@ enum ApplicationCatalog {
                 }
             }
         }
-        addApplication(at: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app"))
+        if includeFinder { addApplication(at: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app")) }
         let sorted = applications.values.sorted { InstalledApplication.precedes($0, $1) }
         return CatalogSnapshot(applications: sorted, inaccessibleRoots: inaccessibleRoots.sorted())
     }
@@ -201,21 +202,86 @@ final class ApplicationIcons {
     func clear() { cache.removeAllObjects() }
 }
 
-/// 监听安装目录变化，而不是每隔几秒全量轮询。目录变化由系统事件通知，扫描由 Model 做防抖。
+/// FSEvents 递归监听目录，覆盖浏览器网页应用及其他子文件夹；扫描仍由 Model 做防抖。
 final class ApplicationDirectoryWatcher {
-    private var sources: [DispatchSourceFileSystemObject] = []
+    private let roots: [String]
+    private let didChange: () -> Void
+    private var stream: FSEventStreamRef?
+    private var watchedPaths: Set<String> = []
 
-    init(didChange: @escaping () -> Void) {
-        for root in ApplicationCatalog.roots {
-            let descriptor = open(root.path, O_EVTONLY)
-            guard descriptor >= 0 else { continue }
-            let source = DispatchSource.makeFileSystemObjectSource(fileDescriptor: descriptor, eventMask: [.write, .rename, .delete], queue: .main)
-            source.setEventHandler(handler: didChange)
-            source.setCancelHandler { close(descriptor) }
-            source.resume()
-            sources.append(source)
-        }
+    init(roots: [URL] = ApplicationCatalog.roots, didChange: @escaping () -> Void) {
+        // FSEvents 返回物理路径（如 /private/var）；不存在的目录也需先解析其现有父目录。
+        self.roots = roots.map { Self.canonicalPath($0.standardizedFileURL.path) }
+        self.didChange = didChange
+        startWatching()
     }
 
-    deinit { sources.forEach { $0.cancel() } }
+    private func startWatching() {
+        // 尚不存在的应用目录先监听最近的现有父目录，创建后会重新建立监听。
+        let paths = Set(roots.map { root in
+            var existing = root
+            while !FileManager.default.fileExists(atPath: existing) && existing != "/" {
+                existing = (existing as NSString).deletingLastPathComponent
+            }
+            return existing
+        })
+        guard !paths.isEmpty else { return }
+        var context = FSEventStreamContext(version: 0, info: Unmanaged.passUnretained(self).toOpaque(), retain: nil, release: nil, copyDescription: nil)
+        guard let newStream = FSEventStreamCreate(kCFAllocatorDefault, { _, info, count, rawPaths, flags, _ in
+            guard let info else { return }
+            let watcher = Unmanaged<ApplicationDirectoryWatcher>.fromOpaque(info).takeUnretainedValue()
+            let paths = Unmanaged<CFArray>.fromOpaque(rawPaths).takeUnretainedValue() as NSArray
+            var relevant = false
+            var restart = false
+            for index in 0..<count {
+                guard let path = paths[index] as? String else { continue }
+                let eventFlags = flags[index]
+                if eventFlags & UInt32(kFSEventStreamEventFlagMustScanSubDirs | kFSEventStreamEventFlagUserDropped | kFSEventStreamEventFlagKernelDropped) != 0 { relevant = true }
+                for rootPath in watcher.roots {
+                    if path == rootPath || path.hasPrefix(rootPath + "/") || rootPath.hasPrefix(path + "/") {
+                        relevant = true
+                        if eventFlags & UInt32(kFSEventStreamEventFlagRootChanged) != 0 ||
+                            (path == rootPath && !watcher.watchedPaths.contains(rootPath) && FileManager.default.fileExists(atPath: rootPath)) { restart = true }
+                    }
+                }
+            }
+            if relevant { watcher.didChange() }
+            if restart {
+                // 不在回调中释放当前流；等回调结束后重新选择存在的监听目录。
+                DispatchQueue.main.async { [weak watcher] in watcher?.restartWatching() }
+            }
+        }, &context, Array(paths) as CFArray, FSEventStreamEventId(kFSEventStreamEventIdSinceNow), 0.3,
+           UInt32(kFSEventStreamCreateFlagUseCFTypes | kFSEventStreamCreateFlagFileEvents | kFSEventStreamCreateFlagWatchRoot)) else { return }
+        FSEventStreamSetDispatchQueue(newStream, .main)
+        if FSEventStreamStart(newStream) { stream = newStream; watchedPaths = paths }
+        else { FSEventStreamInvalidate(newStream); FSEventStreamRelease(newStream) }
+    }
+
+    private func restartWatching() {
+        stopWatching()
+        startWatching()
+        // 重建监听期间可能有新的文件变化，补一次防抖扫描。
+        didChange()
+    }
+
+    private func stopWatching() {
+        guard let stream else { return }
+        FSEventStreamStop(stream)
+        FSEventStreamInvalidate(stream)
+        FSEventStreamRelease(stream)
+        self.stream = nil
+        watchedPaths = []
+    }
+
+    private static func canonicalPath(_ path: String) -> String {
+        if let resolved = realpath(path, nil) {
+            defer { free(resolved) }
+            return String(cString: resolved)
+        }
+        let parent = (path as NSString).deletingLastPathComponent
+        guard parent != path else { return path }
+        return (canonicalPath(parent) as NSString).appendingPathComponent((path as NSString).lastPathComponent)
+    }
+
+    deinit { stopWatching() }
 }

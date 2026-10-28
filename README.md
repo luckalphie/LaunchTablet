@@ -1,113 +1,77 @@
 # LaunchTablet
 
-[English](README.en.md)
+[简体中文](README.zh-CN.md)
 
-面向大屏幕的 macOS 原生应用启动器，使用 SwiftUI + AppKit。当前为 **1.0.0 正式版**，安装包面向 **Apple 芯片 Mac**，最低部署目标为 macOS 14。
+A native macOS app launcher built with SwiftUI and AppKit, designed for large displays. The latest release is **1.0.0**; packaged builds target **Apple Silicon**, with a minimum deployment target of macOS 14. This page describes the current source; see the release notes for the published package.
 
-这是社区独立项目，与 Apple 无隶属或背书关系。
+This is an independent community project and is not affiliated with or endorsed by Apple. The interface supports English and Simplified Chinese, following the system by default with an instant language switch in Settings.
 
-Apple、Microsoft Edge、Google Chrome 等品牌名称和预览中的应用图标归各自权利人所有；MIT 许可适用于本项目代码和自有素材。
+Apple, Microsoft Edge, Google Chrome, and the app icons shown in the preview belong to their respective owners. The MIT license applies to this project's code and original assets.
 
-整个屏幕作为背景，应用网格支持「全屏 / 14 英寸 / 16 英寸 / 24 英寸 / 27 英寸」五种显示范围，可在设置中即时切换并自动保存。默认 14 英寸，居中区域最大 **1120 × 790 逻辑点**；16 英寸最大 **1280 × 900 逻辑点**，24 英寸最大 **1920 × 1080**，27 英寸最大 **2160 × 1215**；全屏图标和名称随可用空间放大，左右各留约 10%、上下各留约 5% 的边距，超宽屏额外收拢横向范围；小屏幕自动缩小。这些是参照不同尺寸屏幕浏览体验的区域预设，不是物理英寸测量。
+![LaunchTablet interface preview](docs/images/overview-en.png)
 
-主网格的翻页可见范围独立于静止网格：全屏延伸到屏幕左右边缘，其它预设在左右各增加一列宽度的过渡空间，空间不足时延伸到屏幕边缘。页面停下后仍居中，相邻页不会提前露出。24/27 英寸预设也会按可用空间放大图标与名称。
+The preview renders the actual interface offscreen using sample apps, without personal app lists or wallpaper.
 
-![LaunchTablet 界面预览](docs/images/overview.png)
+## Features
 
-预览使用真实界面和示例应用离屏生成，不包含个人应用清单或壁纸。界面支持简体中文和英文，默认跟随系统，也可在设置中即时切换。
+- A fullscreen background with five grid areas: **Full screen**, **14-inch** (default, up to 1120 × 790 logical points), **16-inch** (up to 1280 × 900), **24-inch** (up to 1920 × 1080), and **27-inch** (up to 2160 × 1215). Change the area instantly in Settings; the choice is saved. Full screen scales icons and labels with the available area, leaves roughly 10% margins on each side and 5% above and below, and adds more side space on ultrawide displays. All modes shrink on smaller screens. Named sizes are layout presets, not physical screen measurements.
+- Page animations extend to the screen edges in Full screen mode. Other presets add one column of transition space on each side, limited by the physical screen. Resting grids stay centered without showing neighboring pages. The 24-inch and 27-inch presets also scale icons and labels with the available area.
+- Horizontal pagination, search by name or pinyin, keyboard navigation, and layered Escape handling.
+- Drag apps or folders to reorder with insertion guides. Drop onto folders, hover to open them, or move apps between folders. Escape cancels the drag. Layout and hidden apps are saved locally.
+- The launcher settles from 112% scale to its normal size when opened, and enlarges while fading out when dismissed. Folder and hidden-app transitions also respect Reduce Motion.
+- Default folders for utilities, games, and system helpers. Web apps from Edge Apps and Chrome Apps directories get separate browser folders.
+- Changes in application directories and their subdirectories trigger a background refresh; newly installed apps join the current layout automatically.
+- Apple apps appear first; third-party apps use an estimated installation order. Manual arrangements are preserved.
+- Starts in the background without showing a window. Click the Dock icon again or use **Control + Option + Space** to show it on the display containing the pointer.
 
-## 下载与安装
+## Build and run
 
-从 [GitHub Releases](https://github.com/luckalphie/LaunchTablet/releases/latest) 下载 DMG，将 LaunchTablet 拖入 Applications，推出镜像后打开。升级前先退出旧版本。安装包同时提供 SHA-256 校验文件。
+Use macOS with **Swift 6 or newer** and a matching macOS SDK. Scripts follow the current developer tools selected by `xcode-select`, and honor `DEVELOPER_DIR` and `SDKROOT` without changing system settings.
 
-## 启动
-
-使用 Swift 6 工具链和配套的 macOS SDK。源码运行：在仓库目录执行 `sh scripts/run.sh`。
-
-生成可双击的应用：执行 `sh scripts/build-app.sh`，完成后打开 `dist/LaunchTablet.app`。可将生成的应用拖入“应用程序”或 Dock。需要替换应用时先退出正在运行的旧版本。
-
-日常使用只需 `dist/LaunchTablet.app`。内部副屏验收使用 `sh scripts/build-app.sh --test-secondary`，测试包生成到 `.build/ui-testing/LaunchTablet.app`，不放进交付目录。测试包使用独立应用标识，固定在副屏显示，副屏断开时不回退主屏；测试布局单独保存在 `.build/ui-testing/layout.json`，且不注册全局快捷键，避免干扰正式版本。
-
-生成分发安装包：执行 `sh scripts/build-dmg.sh`，生成 `dist/LaunchTablet-<版本>-<构建号>-arm64.dmg` 及 SHA-256 校验文件。DMG 包含正式应用、Applications 快捷入口和安装说明，适用于 Apple 芯片（M 系列）Mac，要求 macOS 14 或更高版本。
-
-脚本通过 `xcrun` 使用当前选中的 Xcode 或 Command Line Tools，不会自动切换开发者目录或绑定某一版本 SDK。可以用 `xcode-select -p`、`xcrun swift --version` 和 `xcrun --sdk macosx --show-sdk-path` 检查环境。调用方设置的 `DEVELOPER_DIR` 和 `SDKROOT` 会被保留。
-
-如工具链与 SDK 不兼容，请安装配套版本，或在单次命令前设置 `DEVELOPER_DIR=/你的开发者目录 SDKROOT=/配套的SDK目录`。仅设置 `DEVELOPER_DIR` 时，SDK 会从该目录自动查找。需要 Xcode 首次启动设置或许可确认时，请先手动完成。
-
-本机 CLT 默认的 macOS 27 SDK 缺少 `SwiftUIMacros` 插件，使用完整 Xcode 可正常构建；此前也已验证 CLT 显式选择其附带的 macOS 26.5 SDK 可用。遇到相同报错时请使用完整 Xcode 或配套 SDK，脚本不会自动降级 SDK。
-
-## 操作
-
-| 操作 | 行为 |
+| Command | Result |
 | --- | --- |
-| 点击 Dock 图标 / `⌃⌥空格` | 呼出；快捷键再次按下可收起 |
-| 触控板横向轻扫 | 翻页，一轮手势最多一页，惯性不会连续跳页 |
-| 普通鼠标滚轮 / 左右箭头 / 分页圆点 | 翻页 |
-| 直接输入 | 搜索应用名称、英文名称、拼音或拼音首字母 |
-| 方向键、回车 | 选择并打开应用；选择跨页时自动跟随 |
-| Esc | 依次关闭弹层、文件夹、清空搜索，最后收起启动器 |
-| 点击背景空白区域 | 收起启动器 |
-| 拖到图标两侧 | 显示插入线，松手调整顺序；文件夹也可重排 |
-| 拖到应用中央停留约 0.45 秒 | 出现加号后松手，新建文件夹 |
-| 拖到文件夹中央 | 松手加入；继续停留约 0.75 秒展开，可指定内部位置 |
-| 拖到文件夹面板外 | 停留约 0.5 秒回到主网格，继续排序或移入另一文件夹 |
-| 拖动中按 Esc / 在无效区域松手 | 取消，保持原有排列 |
-| 拖到左右翻页箭头上停留 | 跨页移动，可放到最后一页的空位 |
-| 右键应用 / 文件夹 | 在访达中显示、隐藏、重命名、解散文件夹等 |
-| 右下角设置 | 切换中英语言、选择呼出快捷键、刷新应用、恢复隐藏应用、退出程序 |
+| `sh scripts/run.sh` | Run from source |
+| `sh scripts/test.sh` | Run Swift Testing checks |
+| `sh scripts/build-app.sh` | Build `dist/LaunchTablet.app` for arm64 |
+| `sh scripts/build-dmg.sh` | Build a DMG and SHA-256 checksum in `dist/` |
+| `sh scripts/export-preview.sh` | Render the documentation preview using isolated sample data |
 
-搜索输入过程中左右键保留光标移动行为；按上下键进入网格导航后，左右键切换应用。清空搜索恢复之前浏览的页面。应用打开成功后自动收起；失败时提示原因。搜索结果中不提供拖动，以免误改原有布局。
+If your compiler and SDK do not match, select a compatible developer tools installation with `DEVELOPER_DIR`; optionally supply `SDKROOT`. Complete any required Xcode first-launch setup yourself.
 
-窗口覆盖鼠标所在屏幕，并直接显示在当前桌面空间。背景使用该屏幕的壁纸缩略图进行模糊与暗化；壁纸无法读取时显示深色渐变。程序收起后保留后台进程。呼出时从 112% 缩回正常大小并淡入，收起时反向放大并淡出；文件夹展开时背景网格轻微缩小与模糊，隐藏应用时图标淡出并重新排布。遵循系统“减少动态效果”设置。
+The local CLT installation's default macOS 27 SDK lacks the `SwiftUIMacros` plugin. Full Xcode builds successfully; CLT was also verified with its bundled macOS 26.5 SDK. If you encounter that error, use full Xcode or a matching SDK. Scripts do not silently downgrade the SDK.
 
-## 界面语言
+The internal secondary-display test build is produced by `sh scripts/build-app.sh --test-secondary` in `.build/ui-testing/`. It uses a separate bundle identifier and will not fall back to the main display. Its layout is isolated in `.build/ui-testing/layout.json`, and it does not register a global shortcut.
 
-设置中的“界面语言 / Language”提供“跟随系统 / System default”“简体中文”和“English”。手动切换立即更新搜索框、设置、菜单栏、右键菜单、操作提示、错误信息和辅助功能标签，并记住选择。系统首选语言不受支持时回退英文。
+## Install
 
-工具、游戏、其它等默认分类按当前界面语言显示；分类的持久化 ID 不变，不因翻译重排或重写布局。自定义文件夹名以及应用本身的名称保持原样；新建文件夹使用创建时的界面语言。语言设置不会修改 macOS 系统语言。
+Download the DMG and optional SHA-256 checksum from [GitHub Releases](https://github.com/luckalphie/LaunchTablet/releases/latest). Open the DMG, drag LaunchTablet into Applications, eject the image, and launch the installed copy. Quit the previous version before replacing it.
 
-## 应用与布局
+The 1.0.0 package is ad hoc signed and **not notarized**. macOS may block a downloaded copy; after trying to open it, use **System Settings → Privacy & Security → Open Anyway** if you trust the sender. There is no need to disable system security.
 
-扫描 `~/Applications`、`/Applications`、`/System/Applications`，补充 Finder。过滤后台辅助应用与启动器自身，使用 bundle ID 去重。用户目录优先，之后为公共应用目录和系统目录。
+## Status and limitations
 
-默认分类保留常用 Apple 应用在主网格，将系统辅助程序收进“其它”、工具和开发类收进“工具”、游戏收进“游戏”。仅在存在对应应用时显示文件夹。分类依据应用声明的标准类别和所在目录；普通应用或缺失类别的应用仍显示在主网格，可以自行拖动分组。
+- Local development and desktop checks use Apple Silicon and macOS 27. The macOS 14 deployment target is not a claim that every supported OS version has been tested.
+- 71 local checks cover application directory changes, grid area preferences, layout, migrations, search, keyboard behavior, and simulated scrolling. Real trackpad gestures and the updated native drag interactions still need further desktop validation.
+- App categories and installation dates come from system metadata and may be missing or inaccurate.
+- Packaged builds are arm64 only. Intel packages are not provided.
+- GitHub Actions checks shell scripts, runs tests, and compiles an arm64 executable. See the [hosted build results](https://github.com/luckalphie/LaunchTablet/actions).
 
-`Edge Apps.localized`、`Chrome Apps.localized` 目录中的网页应用分别放入“Edge”“Chrome”文件夹，来源目录规则优先于应用声明的类别。浏览器本体仍单独显示。升级时自动收拢旧布局中平铺或处于系统分类文件夹中的网页图标，保留自建文件夹；之后新装的网页应用进入对应浏览器文件夹。
+## Language and upgrades
 
-默认排序为 Apple 应用在前（内部按名称排列），第三方应用按安装时间从早到晚，同日期时按名称和 ID 排列。文件夹内也遵循此规则。macOS 未提供统一可靠的安装时间接口：优先读取加入应用目录的日期，再回退到 bundle 创建时间，缺失日期排在已知日期后。日期按 bundle ID 记录，应用更新不会改写原有日期；卸载被完整扫描确认后，再次安装会重新记录。
+Choose **System default**, **简体中文**, or **English** under **Settings → Language**. The choice is saved and updates the interface, menus, hints, errors, and accessibility labels immediately. Unsupported system languages fall back to English. Default category labels are translated; custom folder names and installed app names are preserved.
 
-首次升级时，旧版按名称平铺的默认布局会自动迁移。旧布局已有文件夹、隐藏应用或明显的手动排列时保留；可在设置中选择“恢复默认分类与排序”，确认后重新整理。默认模式下新装应用自动分类和排序；拖动图标、重命名、建文件夹或隐藏应用后进入手动模式，保留用户排列，新应用加入已有对应分类或追加到末尾。恢复默认保留已隐藏的应用。
+When upgrading from the old Launchpad project name, LaunchTablet reads the old layout only if no new layout exists. The next save writes to the LaunchTablet directory and preserves the old file. Existing new settings and layout take priority, and the packaged app migrates the old shortcut preference.
 
-排列、文件夹、安装日期和隐藏状态自动保存到 `~/Library/Application Support/LaunchTablet/layout.json`。从旧名称 Launchpad 升级时，新文件不存在才读取旧目录的布局，下一次保存写入新目录，旧文件保留；新版已有布局时优先使用新版，不覆盖。正式应用还会迁移旧版快捷键偏好，已有新版设置优先。扫描不完整时保留原有排列并推迟首次迁移；布局文件解析失败时保留原文件并提示，不用空布局覆盖。
+## Privacy
 
-目录监听和每次呼出时的扫描用于更新列表。macOS 中的应用 bundle 本质是一个目录，具体结构和代码分工见 [给 Java 开发者的代码导读](docs/开发导读.md)。
+The app reads local app metadata and icons for display and search, and the current display's wallpaper for its blurred background. It contains no networking, telemetry, or analytics code.
 
-## 验证
+Layout, folder names, hidden apps, and observed installation dates are stored in `~/Library/Application Support/LaunchTablet/layout.json`. Shortcut, interface language, and grid area preferences use macOS user defaults. Changing the grid area does not rewrite your arrangement. Apps without a bundle identifier use their local path as an ID, so review layout files before sharing them in an issue.
 
-执行 `sh scripts/test.sh` 运行 Swift Testing 检查，覆盖中英文资源完整性、语言优先级、即时切换、旧布局迁移、分页、Esc 优先级、光标与网格导航、惯性处理、排序、文件夹、空位投放和持久化。测试使用临时目录，不修改日常布局。
+Carbon registers the selected global shortcut; other keyboard and scroll handling stays within this process. The app does not require Accessibility, Input Monitoring, or Screen Recording permission.
 
-1.0.0 安装包采用本地临时签名，尚未经过 Apple Developer ID 签名与公证；首次打开下载的应用可能被系统拦截，可按包内说明在“隐私与安全性”中允许打开。
+## Contributing and license
 
-## 测试状态与已知限制
+See [Contributing](CONTRIBUTING.md) and the [Java developer guide](docs/开发导读.md), currently in Chinese. The project is licensed under the [MIT License](LICENSE).
 
-- 本地开发与实机检查环境为 Apple 芯片、macOS 27；最低部署目标 macOS 14 不代表所有 14+ 系统都已经实机验收。
-- 68 项 Swift Testing 检查已在本地通过，覆盖网格范围、偏好保存、布局、迁移、搜索、键盘和模拟滚动事件。真实触控板横扫、惯性及新版原生拖拽仍需继续实机验收，详见 [验证记录](docs/验证记录.md)。
-- 应用的类别可能缺失或不准确，安装日期取自系统可读取的目录/创建时间，因此默认分类与排序可能存在误差，可手动整理。
-- 安装包仅包含 arm64，不提供 Intel 版本。当前安装包尚未做 Apple 开发者签名与公证。
-- GitHub Actions 检查脚本语法、运行测试并编译 arm64 可执行文件，托管结果见 [构建记录](https://github.com/luckalphie/LaunchTablet/actions)。
-
-## 隐私与权限
-
-应用读取本机应用目录、名称、图标、类别及日期，用于显示与搜索；读取当前显示器壁纸生成模糊背景。应用列表、搜索词及壁纸不会上传，本项目没有联网、遥测或统计代码。
-
-图标由系统读取并缓存在内存中；排列、隐藏状态、文件夹名和安装日期写入 `~/Library/Application Support/LaunchTablet/layout.json`。快捷键、界面语言和网格显示范围保存在系统用户偏好中；改变显示范围不修改排列。无 bundle ID 的应用会以本机路径作为标识，因此反馈问题前请先检查布局文件中的个人信息。
-
-使用 Carbon 注册指定的全局快捷键；普通键盘与滚轮事件仅在启动器进程内处理，不需要授予“辅助功能”“输入监控”或“屏幕录制”权限。受系统保护、权限不足的应用目录或壁纸可能无法读取，程序会保留既有布局或使用默认背景。
-
-## 参与与许可证
-
-反馈问题与提交改动请参阅 [参与开发](CONTRIBUTING.md)。代码采用 [MIT License](LICENSE)。
-
-源码仓库只保存源码、文档和示例素材；`.build/`、`.swiftpm/`、`dist/` 和本机 Xcode 状态文件均排除在提交之外。分发的 DMG 和校验文件应上传到 GitHub Releases。
-
-文档预览可用 `sh scripts/export-preview.sh` 重新生成，使用真实 SwiftUI View 和临时示例布局，不显示窗口、不采集屏幕或个人应用列表。
+Build products, local Xcode workspace state, and the `dist/` directory are excluded from Git. Publish downloadable DMGs and checksums through GitHub Releases.

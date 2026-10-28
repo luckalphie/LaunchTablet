@@ -4,7 +4,7 @@
 
 ## 开发环境
 
-需要 macOS、Swift 6 或更新版本，以及配套的 macOS SDK。构建脚本遵循当前选中的开发者工具，也支持通过 `DEVELOPER_DIR`、`SDKROOT` 显式选择。详见 [README](README.md) 中的环境说明。
+需要 macOS、Swift 6 或更新版本，以及配套的 macOS SDK。构建脚本遵循当前选中的开发者工具，也支持通过 `DEVELOPER_DIR`、`SDKROOT` 显式选择。详见 [中文说明](README.zh-CN.md) 中的环境说明。
 
 先执行 `sh scripts/test.sh`，再执行 `sh scripts/build-app.sh`。打包目标固定为 Apple 芯片；CI 会检查脚本语法、运行测试并交叉编译 arm64 可执行文件，不会发布应用或启动全屏窗口。
 

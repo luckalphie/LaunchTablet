@@ -16,7 +16,7 @@ macOS 14 或更高版本，Apple 芯片（M 系列）Mac。
 如果没有对应选项或仍无法打开，请把系统提示原文反馈给发送者。
 
 基本操作
-• 点击 Dock 图标或按 Control + Option + 空格呼出/收起。
+• 启动后先在后台运行；再次点击 Dock 图标或按 Control + Option + 空格呼出。快捷键也可收起。
 • 窗口在鼠标所在显示器出现；设置中可选网格范围「全屏 / 14 英寸 / 16 英寸 / 24 英寸 / 27 英寸」。
 • 默认 14 英寸居中显示，16、24、27 英寸提供更大的居中区域；小屏幕自动缩小并记住选择。
 • 全屏模式图标和名称随空间放大，左右留白更宽；超宽屏会额外收拢网格，竖屏适配为 5 列 7 行。
@@ -47,7 +47,7 @@ English quick start
 Requires an Apple Silicon Mac running macOS 14 or later.
 1. Drag LaunchTablet.app into Applications, then eject the disk image.
 2. Quit the previous launcher before opening LaunchTablet.
-3. Show/hide with Control + Option + Space. Type to search, scroll to turn pages, or press Esc to go back.
+3. The app starts in the background. Click its Dock icon again or press Control + Option + Space to show it; the shortcut also hides it. Type to search, scroll to turn pages, or press Esc to go back.
 4. Change Settings → Language to System default, 简体中文, or English. Custom folder names stay unchanged.
 5. Drag beside icons to reorder, onto folders to add, or hover over a folder to open it.
 6. Choose Settings → Grid area → Full screen, 14-inch (default), 16-inch, 24-inch, or 27-inch. Changes apply immediately and are saved; smaller screens scale down automatically. Full screen enlarges icons and labels with balanced margins, wider on the sides, and adapts to ultrawide and portrait displays.
