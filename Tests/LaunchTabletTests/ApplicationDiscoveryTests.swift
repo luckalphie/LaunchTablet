@@ -100,10 +100,22 @@ private final class DelayedCatalog: @unchecked Sendable {
         withExtendedLifetime(watcher) {}
     }
 
-    private func createApplication(id: String, in parent: URL) throws {
+    @Test func launchableAgentApplicationsAreIncludedButBackgroundOnlyAreExcluded() throws {
+        let root = directory.appendingPathComponent("Applications")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        try createApplication(id: "menu.bar", in: root, extraInfo: ["LSUIElement": true])
+        try createApplication(id: "background.helper", in: root, extraInfo: ["LSBackgroundOnly": true])
+
+        let applications = ApplicationCatalog.scan(roots: [root], includeFinder: false).applications
+        #expect(applications.contains { $0.id == "menu.bar" })
+        #expect(!applications.contains { $0.id == "background.helper" })
+    }
+
+    private func createApplication(id: String, in parent: URL, extraInfo: [String: Any] = [:]) throws {
         let contents = parent.appendingPathComponent("\(id).app/Contents")
         try FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
-        let info: [String: Any] = ["CFBundleIdentifier": id, "CFBundleName": id, "CFBundlePackageType": "APPL"]
+        var info: [String: Any] = ["CFBundleIdentifier": id, "CFBundleName": id, "CFBundlePackageType": "APPL"]
+        info.merge(extraInfo) { _, newValue in newValue }
         let data = try PropertyListSerialization.data(fromPropertyList: info, format: .xml, options: 0)
         try data.write(to: contents.appendingPathComponent("Info.plist"))
     }

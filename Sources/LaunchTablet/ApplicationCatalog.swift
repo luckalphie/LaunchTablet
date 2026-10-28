@@ -122,8 +122,9 @@ enum ApplicationCatalog {
             let url = rawURL.resolvingSymlinksInPath().standardizedFileURL
             guard let bundle = Bundle(url: url) else { return }
             let info = bundle.infoDictionary ?? [:]
-            // 隐藏菜单栏助手、后台进程和启动器自身，避免把辅助程序当成可启动应用。
-            guard !boolean(info["LSUIElement"]), !boolean(info["LSBackgroundOnly"]),
+            // LSUIElement 只表示不显示 Dock 图标，仍可能是用户主动启动的完整应用（例如 Window Switcher）。
+            // 只有明确声明为后台进程的 bundle 才不应出现在启动器中。
+            guard !boolean(info["LSBackgroundOnly"]),
                   !AppIdentity.isLauncher(bundleIdentifier: bundle.bundleIdentifier) else { return }
             let id = bundle.bundleIdentifier ?? url.path
             guard applications[id] == nil else { return }
