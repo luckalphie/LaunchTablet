@@ -73,11 +73,18 @@ import Testing
         model.beginDragging(.application("id-1"))
         model.updateDropTarget(folder.id, grouping: true)
         #expect(model.isGroupingDrop)
-        try await Task.sleep(for: .milliseconds(850))
+        // CI 负载波动时定时任务可能晚于理论时间，等待实际状态变化再验证。
+        for _ in 0..<30 {
+            if model.openFolderID == folder.id { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
         #expect(model.openFolderID == folder.id)
         #expect(model.draggedItemID == "app:id-1")
         model.beginFolderExitHover()
-        try await Task.sleep(for: .milliseconds(600))
+        for _ in 0..<30 {
+            if model.openFolderID == nil { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
         #expect(model.openFolderID == nil)
         #expect(model.layout == original)
         model.endDragging()
