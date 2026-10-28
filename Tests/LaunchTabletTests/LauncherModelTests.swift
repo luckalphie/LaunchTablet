@@ -96,7 +96,10 @@ import Testing
         await model.refreshApplications().value
         model.beginDragging(model.rootItems[0])
         model.updateDropTarget(model.rootItems[1].id, grouping: true)
-        try await Task.sleep(for: .milliseconds(550))
+        for _ in 0..<30 {
+            if model.isGroupingDrop { break }
+            try await Task.sleep(for: .milliseconds(100))
+        }
         #expect(model.isGroupingDrop)
         model.updateDropTarget(model.rootItems[1].id, grouping: false, after: true)
         #expect(!model.isGroupingDrop)
