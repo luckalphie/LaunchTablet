@@ -1,4 +1,4 @@
-LaunchTablet 1.0.0
+LaunchTablet 1.0.1
 
 适用系统
 macOS 14 或更高版本，Apple 芯片（M 系列）Mac。
@@ -51,7 +51,7 @@ Requires an Apple Silicon Mac running macOS 14 or later.
 4. Change Settings → Language to System default, 简体中文, or English. Custom folder names stay unchanged.
 5. Drag beside icons to reorder, onto folders to add, or hover over a folder to open it.
 6. Choose Settings → Grid area → Full screen, 14-inch (default), 16-inch, 24-inch, or 27-inch. Changes apply immediately and are saved; smaller screens scale down automatically. Full screen enlarges icons and labels with balanced margins, wider on the sides, and adapts to ultrawide and portrait displays.
-LaunchTablet 1.0.0 uses an ad hoc signature and is not notarized. If macOS blocks a trusted copy, try opening it once, then use System Settings → Privacy & Security → Open Anyway.
+LaunchTablet 1.0.1 uses an ad hoc signature and is not notarized. If macOS blocks a trusted copy, try opening it once, then use System Settings → Privacy & Security → Open Anyway.
 Upgrades from the old Launchpad project name preserve the old layout file and write future changes to the LaunchTablet directory.
 
 Page animations can travel to the screen edges in Full screen mode. Other presets add one column of transition space on each side, within the physical screen bounds. Resting grids stay centered without revealing neighboring pages.
