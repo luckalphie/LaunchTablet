@@ -12,8 +12,10 @@ struct InstalledApplication: Identifiable, Sendable {
     let isAppleApplication: Bool
     let installationDate: Date?
     let category: ApplicationCategory?
+    /// 用户应用目录中的第一层子目录；启动器目前只支持一层文件夹。
+    let userDirectory: String?
 
-    init(id: String, url: URL, name: String, searchTerms: String, isAppleApplication: Bool = false, installationDate: Date? = nil, category: ApplicationCategory? = nil) {
+    init(id: String, url: URL, name: String, searchTerms: String, isAppleApplication: Bool = false, installationDate: Date? = nil, category: ApplicationCategory? = nil, userDirectory: String? = nil) {
         self.id = id
         self.url = url
         self.name = name
@@ -21,6 +23,7 @@ struct InstalledApplication: Identifiable, Sendable {
         self.isAppleApplication = isAppleApplication
         self.installationDate = installationDate
         self.category = category
+        self.userDirectory = userDirectory
     }
 
     func matches(_ query: String) -> Bool {
@@ -118,7 +121,7 @@ enum ApplicationCatalog {
         var inaccessibleRoots = Set<String>()
         let keys: [URLResourceKey] = [.localizedNameKey, .isDirectoryKey]
 
-        func addApplication(at rawURL: URL) {
+        func addApplication(at rawURL: URL, userRoot: URL? = nil) {
             let url = rawURL.resolvingSymlinksInPath().standardizedFileURL
             guard let bundle = Bundle(url: url) else { return }
             let info = bundle.infoDictionary ?? [:]
@@ -146,7 +149,16 @@ enum ApplicationCatalog {
             // 原路径保留浏览器目录来源，符号链接解析后仍可正确归组。
             let category = ApplicationCategory.browserFolder(in: rawURL.path)
                 ?? ApplicationCategory.from(bundleCategory: info["LSApplicationCategoryType"] as? String, path: url.path, isApple: isApple, bundleID: id)
-            applications[id] = InstalledApplication(id: id, url: url, name: name, searchTerms: InstalledApplication.normalize(terms.joined(separator: " ")), isAppleApplication: isApple, installationDate: installationDate, category: category)
+            var userDirectory: String?
+            if let userRoot, category?.isBrowserFolder != true {
+                let rootComponents = userRoot.standardizedFileURL.pathComponents
+                let components = rawURL.standardizedFileURL.pathComponents
+                if components.starts(with: rootComponents), components.count > rootComponents.count + 1 {
+                    userDirectory = components[rootComponents.count]
+                    if userDirectory?.hasSuffix(".localized") == true { userDirectory = String(userDirectory!.dropLast(".localized".count)) }
+                }
+            }
+            applications[id] = InstalledApplication(id: id, url: url, name: name, searchTerms: InstalledApplication.normalize(terms.joined(separator: " ")), isAppleApplication: isApple, installationDate: installationDate, category: category, userDirectory: userDirectory)
         }
 
         for root in roots {
@@ -157,7 +169,8 @@ enum ApplicationCatalog {
             }) else { inaccessibleRoots.insert(root.path); continue }
             for case let url as URL in iterator {
                 if url.pathExtension.lowercased() == "app" {
-                    addApplication(at: url)
+                    let userRoot = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").standardizedFileURL
+                    addApplication(at: url, userRoot: root.standardizedFileURL == userRoot ? root : nil)
                     iterator.skipDescendants()
                 }
             }

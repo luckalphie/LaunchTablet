@@ -58,6 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var eventMonitor: Any?
     private var directoryWatcher: ApplicationDirectoryWatcher?
     private var screenObserver: NSObjectProtocol?
+    private var statusItem: NSStatusItem?
     private var isHiding = false
     private var animationSequence = 0
     private var trackingMenu = false
@@ -244,10 +245,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         editItem.submenu = edit
         menu.addItem(editItem)
         NSApp.mainMenu = menu
+        configureStatusMenu()
+    }
+
+    private func configureStatusMenu() {
+        // NSStatusItem 需要保持强引用，否则系统可能移除菜单栏图标。
+        if statusItem == nil { statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength) }
+        statusItem?.button?.image = NSImage(systemSymbolName: "square.grid.3x3.fill", accessibilityDescription: AppIdentity.name)
+        statusItem?.button?.toolTip = AppIdentity.name
+        let menu = NSMenu()
+        let toggle = menu.addItem(withTitle: model.text(.toggleApplication), action: #selector(toggleLauncher), keyEquivalent: "")
+        toggle.target = self
+        menu.addItem(.separator())
+        let quit = menu.addItem(withTitle: model.text(.quitApplication), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
+        quit.target = NSApp
+        statusItem?.menu = menu
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
     }
 }

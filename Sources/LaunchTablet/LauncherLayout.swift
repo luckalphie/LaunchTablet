@@ -41,8 +41,9 @@ struct LauncherLayout: Codable, Equatable {
     var installationDates: [String: Date] = [:]
     /// 独立迁移标记，兼容已保存的手动布局；浏览器网页图标只自动收拢一次，之后仍可自行整理。
     var browserGroupingVersion = 0
+    var userDirectoryGroupingVersion = 0
 
-    enum CodingKeys: String, CodingKey { case items, hiddenApplicationIDs, organizationVersion, isManuallyArranged, installationDates, browserGroupingVersion }
+    enum CodingKeys: String, CodingKey { case items, hiddenApplicationIDs, organizationVersion, isManuallyArranged, installationDates, browserGroupingVersion, userDirectoryGroupingVersion }
     init(items: [LauncherItem] = [], hiddenApplicationIDs: Set<String> = [], organizationVersion: Int = 0, isManuallyArranged: Bool = false) {
         self.items = items
         self.hiddenApplicationIDs = hiddenApplicationIDs
@@ -58,6 +59,7 @@ struct LauncherLayout: Codable, Equatable {
         isManuallyArranged = try values.decodeIfPresent(Bool.self, forKey: .isManuallyArranged) ?? false
         installationDates = try values.decodeIfPresent([String: Date].self, forKey: .installationDates) ?? [:]
         browserGroupingVersion = try values.decodeIfPresent(Int.self, forKey: .browserGroupingVersion) ?? 0
+        userDirectoryGroupingVersion = try values.decodeIfPresent(Int.self, forKey: .userDirectoryGroupingVersion) ?? 0
     }
 
     /// 类似 Java 的聚合更新入口：迁移、安装时间记忆和布局对账集中在一起，View 不处理持久化规则。
@@ -84,16 +86,21 @@ struct LauncherLayout: Codable, Equatable {
             organizeDefault(applications: ordered)
         } else {
             let categories = Dictionary(uniqueKeysWithValues: ordered.compactMap { app in app.category.map { (app.id, $0) } })
-            reconcile(applicationIDs: ordered.map(\.id), removeMissing: removeMissing, categoryByID: categories)
+            let directories = Dictionary(uniqueKeysWithValues: ordered.compactMap { app in app.userDirectory.map { (app.id, $0) } })
+            reconcile(applicationIDs: ordered.map(\.id), removeMissing: removeMissing, categoryByID: categories, directoryByID: directories)
             if browserGroupingVersion == 0 && removeMissing {
                 groupBrowserApplications(categoryByID: categories)
                 browserGroupingVersion = 1
+            }
+            if userDirectoryGroupingVersion == 0 && removeMissing {
+                groupUserDirectoryApplications(directoryByID: directories)
+                userDirectoryGroupingVersion = 1
             }
         }
     }
 
     /// 新装应用追加到末尾；卸载应用移除；已有顺序和文件夹保持不变，同一个应用只出现一次。
-    mutating func reconcile(applicationIDs: [String], removeMissing: Bool = true, categoryByID: [String: ApplicationCategory] = [:]) {
+    mutating func reconcile(applicationIDs: [String], removeMissing: Bool = true, categoryByID: [String: ApplicationCategory] = [:], directoryByID: [String: String] = [:]) {
         var available = Set(applicationIDs)
         // 目录读取失败不代表应用卸载；扫描不完整时保留既有布局，防止一次失败清空用户排列。
         if !removeMissing {
@@ -112,7 +119,11 @@ struct LauncherLayout: Codable, Equatable {
         // 已经存在分类文件夹时，新安装应用直接进入对应文件夹，保持“工具/游戏/其它”持续有效。
         var remaining: [String] = []
         for id in newIDs {
-            if let category = categoryByID[id], let folder = items.firstIndex(where: { $0.folderCategory == category }) {
+            if let directory = directoryByID[id] {
+                let folderID = "user-directory:" + directory
+                if let folder = items.firstIndex(where: { $0.id == folderID }) { items[folder].applicationIDs.append(id) }
+                else { items.append(LauncherItem(id: folderID, applicationIDs: [id], folderName: directory)) }
+            } else if let category = categoryByID[id], let folder = items.firstIndex(where: { $0.folderCategory == category }) {
                 items[folder].applicationIDs.append(id)
             } else if let category = categoryByID[id], category.isBrowserFolder {
                 // 手动模式下首次安装某浏览器的网页应用，也建立其专属文件夹，不散落到主网格。
@@ -128,9 +139,16 @@ struct LauncherLayout: Codable, Equatable {
         let ordered = applications.sorted { InstalledApplication.precedes($0, $1, installationDates: installationDates) }
         var result: [LauncherItem] = []
         var folderIndices: [ApplicationCategory: Int] = [:]
+        var directoryIndices: [String: Int] = [:]
         var placed = hiddenApplicationIDs
         for application in ordered where placed.insert(application.id).inserted {
-            if let category = application.category {
+            if let directory = application.userDirectory {
+                if let index = directoryIndices[directory] { result[index].applicationIDs.append(application.id) }
+                else {
+                    directoryIndices[directory] = result.count
+                    result.append(LauncherItem(id: "user-directory:" + directory, applicationIDs: [application.id], folderName: directory))
+                }
+            } else if let category = application.category {
                 if let index = folderIndices[category] {
                     result[index].applicationIDs.append(application.id)
                 } else {
@@ -144,7 +162,33 @@ struct LauncherLayout: Codable, Equatable {
         items = result
         organizationVersion = 1
         browserGroupingVersion = 1
+        userDirectoryGroupingVersion = 1
         isManuallyArranged = false
+    }
+
+    /// 只迁移平铺和系统分类中的应用，自建文件夹与隐藏状态由用户控制。
+    private mutating func groupUserDirectoryApplications(directoryByID: [String: String]) {
+        for directory in Set(directoryByID.values).sorted() {
+            let folderID = "user-directory:" + directory
+            let movedIDs = items.filter { !$0.isFolder || $0.folderCategory != nil }
+                .flatMap(\.applicationIDs).filter { directoryByID[$0] == directory }
+            guard !movedIDs.isEmpty else { continue }
+            let moved = Set(movedIDs)
+            let target = items.firstIndex { $0.id == folderID }
+            guard let anchor = target ?? items.firstIndex(where: { $0.applicationIDs.contains(where: moved.contains) }) else { continue }
+            var folder = target.map { items[$0] } ?? LauncherItem(id: folderID, applicationIDs: [], folderName: directory)
+            var placed = Set(folder.applicationIDs)
+            folder.applicationIDs += movedIDs.filter { placed.insert($0).inserted }
+            var result: [LauncherItem] = []
+            for (index, original) in items.enumerated() {
+                if index == anchor { result.append(folder) }
+                if index == target { continue }
+                var item = original
+                item.applicationIDs.removeAll { moved.contains($0) }
+                if !item.applicationIDs.isEmpty { result.append(item) }
+            }
+            items = result
+        }
     }
 
     /// 升级时收拢以前平铺或自动分类到“工具”等位置的网页应用，保留自建文件夹及其余图标的相对顺序。
