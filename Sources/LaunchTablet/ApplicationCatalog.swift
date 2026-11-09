@@ -8,6 +8,8 @@ struct InstalledApplication: Identifiable, Sendable {
     let url: URL
     let name: String
     let searchTerms: String
+    let localizedNames: [String: String]
+    let sortName: String
     /// Apple 自带应用优先显示；安装日期用于第三方应用的默认顺序。
     let isAppleApplication: Bool
     let installationDate: Date?
@@ -15,15 +17,23 @@ struct InstalledApplication: Identifiable, Sendable {
     /// 用户应用目录中的第一层子目录；启动器目前只支持一层文件夹。
     let userDirectory: String?
 
-    init(id: String, url: URL, name: String, searchTerms: String, isAppleApplication: Bool = false, installationDate: Date? = nil, category: ApplicationCategory? = nil, userDirectory: String? = nil) {
+    init(id: String, url: URL, name: String, searchTerms: String, isAppleApplication: Bool = false, installationDate: Date? = nil, category: ApplicationCategory? = nil, userDirectory: String? = nil, localizedNames: [String: String] = [:], sortName: String? = nil) {
         self.id = id
         self.url = url
         self.name = name
         self.searchTerms = searchTerms
+        self.localizedNames = localizedNames
+        self.sortName = sortName ?? name
         self.isAppleApplication = isAppleApplication
         self.installationDate = installationDate
         self.category = category
         self.userDirectory = userDirectory
+    }
+
+    func localized(for language: InterfaceLanguage) -> Self {
+        Self(id: id, url: url, name: localizedNames[language.rawValue] ?? sortName, searchTerms: searchTerms,
+             isAppleApplication: isAppleApplication, installationDate: installationDate, category: category,
+             userDirectory: userDirectory, localizedNames: localizedNames, sortName: sortName)
     }
 
     func matches(_ query: String) -> Bool {
@@ -43,7 +53,7 @@ struct InstalledApplication: Identifiable, Sendable {
             let rightDate = installationDates[right.id] ?? right.installationDate ?? .distantFuture
             if leftDate != rightDate { return leftDate < rightDate }
         }
-        let result = left.name.localizedStandardCompare(right.name)
+        let result = left.sortName.localizedStandardCompare(right.sortName)
         return result == .orderedSame ? left.id < right.id : result == .orderedAscending
     }
 }
@@ -133,14 +143,15 @@ enum ApplicationCatalog {
             guard applications[id] == nil else { return }
 
             let fileName = (try? url.resourceValues(forKeys: [.localizedNameKey]).localizedName) ?? url.lastPathComponent
-            let localized = bundle.localizedInfoDictionary
-            let displayName = localized?["CFBundleDisplayName"] as? String
-                ?? localized?["CFBundleName"] as? String
-                ?? fileName
-            let name = displayName.hasSuffix(".app") ? String(displayName.dropLast(4)) : displayName
-            let latin = name.applyingTransform(.toLatin, reverse: false) ?? name
-            let initials = latin.split(whereSeparator: { $0.isWhitespace }).compactMap(\.first).map(String.init).joined()
-            let terms = [name, url.deletingPathExtension().lastPathComponent, info["CFBundleName"] as? String ?? "", latin, latin.replacingOccurrences(of: " ", with: ""), initials]
+            let name = [info["CFBundleDisplayName"] as? String, info["CFBundleName"] as? String, fileName, url.deletingPathExtension().lastPathComponent]
+                .compactMap { $0.map(cleanName) }.first { !$0.isEmpty } ?? url.lastPathComponent
+            let localizedNames = localizedApplicationNames(in: bundle)
+            let names = [name, fileName, url.deletingPathExtension().lastPathComponent, info["CFBundleName"] as? String ?? ""] + Array(localizedNames.values)
+            let terms = names.flatMap { value -> [String] in
+                let latin = value.applyingTransform(.toLatin, reverse: false) ?? value
+                let initials = latin.split(whereSeparator: { $0.isWhitespace }).compactMap(\.first).map(String.init).joined()
+                return [value, latin, latin.replacingOccurrences(of: " ", with: ""), initials]
+            }
             let resourceValues = try? url.resourceValues(forKeys: [.addedToDirectoryDateKey, .creationDateKey])
             // 优先使用加入当前应用目录的日期；旧应用可能没有此属性，再使用 bundle 创建时间。
             // 更新应用会替换 bundle，Layout 首次记录后按 ID 保留日期，避免更新导致顺序跳动。
@@ -158,7 +169,7 @@ enum ApplicationCatalog {
                     if userDirectory?.hasSuffix(".localized") == true { userDirectory = String(userDirectory!.dropLast(".localized".count)) }
                 }
             }
-            applications[id] = InstalledApplication(id: id, url: url, name: name, searchTerms: InstalledApplication.normalize(terms.joined(separator: " ")), isAppleApplication: isApple, installationDate: installationDate, category: category, userDirectory: userDirectory)
+            applications[id] = InstalledApplication(id: id, url: url, name: name, searchTerms: InstalledApplication.normalize(terms.joined(separator: " ")), isAppleApplication: isApple, installationDate: installationDate, category: category, userDirectory: userDirectory, localizedNames: localizedNames)
         }
 
         for root in roots {
@@ -178,6 +189,38 @@ enum ApplicationCatalog {
         if includeFinder { addApplication(at: URL(fileURLWithPath: "/System/Library/CoreServices/Finder.app")) }
         let sorted = applications.values.sorted { InstalledApplication.precedes($0, $1) }
         return CatalogSnapshot(applications: sorted, inaccessibleRoots: inaccessibleRoots.sorted())
+    }
+
+    private static func cleanName(_ name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.hasSuffix(".app") ? String(trimmed.dropLast(4)) : trimmed
+    }
+
+    private static func localizedApplicationNames(in bundle: Bundle) -> [String: String] {
+        guard let resources = bundle.resourceURL else { return [:] }
+        // 系统应用常用 InfoPlist.loctable；第三方应用通常使用各语言目录中的 InfoPlist.strings。
+        let tableURL = resources.appendingPathComponent("InfoPlist.loctable")
+        let table = (try? Data(contentsOf: tableURL)).flatMap { try? PropertyListSerialization.propertyList(from: $0, format: nil) } as? [String: [String: String]] ?? [:]
+        let directories = (try? FileManager.default.contentsOfDirectory(at: resources, includingPropertiesForKeys: nil)) ?? []
+        var values = table
+        for directory in directories where directory.pathExtension.lowercased() == "lproj" {
+            let stringsURL = directory.appendingPathComponent("InfoPlist.strings")
+            guard let data = try? Data(contentsOf: stringsURL),
+                  let strings = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: String] else { continue }
+            values[directory.deletingPathExtension().lastPathComponent, default: [:]].merge(strings) { _, new in new }
+        }
+        var result: [String: String] = [:]
+        for (language, choices) in [(InterfaceLanguage.simplifiedChinese, ["zh-hans", "zh-cn", "zh-sg", "zh"]), (.english, ["en", "en-us", "en-gb"])] {
+            for choice in choices {
+                guard let entry = values.first(where: { $0.key.lowercased().replacingOccurrences(of: "_", with: "-") == choice })?.value else { continue }
+                if let name = [entry["CFBundleDisplayName"], entry["CFBundleName"]]
+                    .compactMap({ $0.map(cleanName) }).first(where: { !$0.isEmpty }) {
+                    result[language.rawValue] = name
+                    break
+                }
+            }
+        }
+        return result
     }
 
     private static func isAppleApplication(at url: URL, bundleID: String) -> Bool {

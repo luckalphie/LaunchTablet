@@ -38,6 +38,7 @@ final class LauncherModel: ObservableObject {
         didSet {
             guard language != oldValue else { return }
             preferences.set(language.rawValue, forKey: "interfaceLanguage")
+            updateApplicationNames()
             languageChanged?()
         }
     }
@@ -120,6 +121,12 @@ final class LauncherModel: ObservableObject {
     }
 
     var localizer: Localizer { Localizer(language: language, preferredLanguages: preferredLanguages) }
+    private func updateApplicationNames() {
+        let resolved = localizer.resolvedLanguage
+        let updated = applications.map { $0.localized(for: resolved) }
+        applicationsByID = Dictionary(updated.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        applications = updated
+    }
     func text(_ key: TextKey, _ arguments: CVarArg...) -> String { localizer.text(key, arguments: arguments) }
     var shortcutLabel: String { shortcut.label(using: localizer) }
     var catalogWarning: String? { hasCatalogWarning ? text(.inaccessibleApplications) : nil }
@@ -229,7 +236,7 @@ final class LauncherModel: ObservableObject {
             while true {
                 let snapshot = await Task.detached(priority: .userInitiated, operation: scan).value
                 guard let self else { return }
-                var discovered = snapshot.applications
+                var discovered = snapshot.applications.map { $0.localized(for: self.localizer.resolvedLanguage) }
                 if !snapshot.inaccessibleRoots.isEmpty {
                     let found = Set(discovered.map(\.id))
                     discovered += self.applications.filter { !found.contains($0.id) }
